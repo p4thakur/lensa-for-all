@@ -8,6 +8,7 @@
 # https://github.com/huggingface/diffusers/tree/main/examples/dreambooth
 # https://github.com/ShivamShrirao/diffusers/tree/main/examples/dreambooth
 # https://aws.amazon.com/blogs/machine-learning/fine-tune-text-to-image-stable-diffusion-models-with-amazon-sagemaker-jumpstart/
+# https://towardsdatascience.com/how-to-fine-tune-stable-diffusion-using-dreambooth-dfa6694524ae
 # https://techpp.com/2022/10/10/how-to-train-stable-diffusion-ai-dreambooth/
 # https://github.com/JoePenna/Dreambooth-Stable-Diffusion
 # https://github.com/sayakpaul/dreambooth-keras
@@ -35,7 +36,11 @@ from sagemaker.utils import name_from_base
 from sagemaker.s3 import S3Uploader
 from sagemaker.tuner import ContinuousParameter, HyperparameterTuner, IntegerParameter
 from utils.logger import logger
-from utils.misc import compress_dir_to_model_tar_gz, create_role_if_not_exists
+from utils.misc import (
+    compress_dir_to_model_tar_gz,
+    create_bucket_if_not_exists,
+    create_role_if_not_exists,
+)
 
 
 IS_MODEL_ALREADY_UPLOADED = False
@@ -71,11 +76,6 @@ if __name__ == "__main__":
 
     use_jumpstart = config["model"]["use_jumpstart"]
     model_data = config["model"]["model_data"]
-    model_data = (
-        model_data
-        if model_data is None
-        else f"s3://{bucket}/{base_prefix}/output/{model_data}/output/model.tar.gz"
-    )
     with_prior_preservation = config["model"]["with_prior_preservation"]
     train_text_encoder = config["model"]["train_text_encoder"]
     max_steps = config["model"]["max_steps"]
@@ -90,9 +90,20 @@ if __name__ == "__main__":
     boto_session = boto3.Session(profile_name=profile_name, region_name=region_name)
     sm_session = sagemaker.session.Session(boto_session=boto_session)
     role = (
-        create_role_if_not_exists(boto_session, region_name, logger)
+        create_role_if_not_exists(boto_session, region_name, logger=logger)
         if role is None
         else role
+    )
+    bucket = (
+        create_bucket_if_not_exists(boto_session, region_name, logger=logger)
+        if bucket is None
+        else bucket
+    )
+
+    model_data = (
+        model_data
+        if model_data is None
+        else f"s3://{bucket}/{base_prefix}/output/{model_data}/output/model.tar.gz"
     )
 
     train_ds_path = f"s3://{bucket}/{base_prefix}/{dataset_prefix}/"
@@ -236,8 +247,6 @@ if __name__ == "__main__":
                 "learning_rate": 2e-06 if learning_rate is None else learning_rate,
                 "lr_warmup_steps": 0,
                 "max_train_steps": None if max_steps is None else max_steps,
-                "validation_prompt": f"'a photo of {subject_name} {class_name}, \
-                ultra realistic, 8k uhd'",
                 "num_class_images": 200,
             }
 
@@ -254,7 +263,10 @@ if __name__ == "__main__":
                     params["set_grads_to_none"] = ""
 
             if wandb_api_key is not None:
+                validation_prompt = f"'a photo of {subject_name} {class_name} with Eiffel Tower in the background'"
+
                 params["report_to"] = "wandb"
+                params["validation_prompt"] = validation_prompt
                 params["wandb_api_key"] = wandb_api_key
 
             train_job_name = name_from_base(

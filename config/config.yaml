@@ -1,5 +1,5 @@
 environment:
-  iam_profile_name:
+  iam_profile_name: default
   region_name: us-east-1
   iam_role:
   ebs_dataset_dir: input_directory
