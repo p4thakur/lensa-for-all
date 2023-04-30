@@ -1,0 +1,29 @@
+environment:
+  iam_profile_name:
+  region_name: us-east-1
+  iam_role:
+  ebs_dataset_dir: input_directory
+  s3_bucket:
+  s3_base_prefix: lensa-for-all
+  s3_dataset_prefix: input_directory
+  hf_token:
+  wandb_api_key:
+
+input:
+  subject_name: sks
+  class_name: person
+
+model:
+  use_jumpstart: False
+  model_data:
+  with_prior_preservation: True
+  train_text_encoder: True
+  max_steps: 300
+  batch_size: 1
+  learning_rate: 1e-06
+  tune_params: False
+  max_tuning_jobs: 7
+  train_instance_type: ml.g5.2xlarge
+  infer_instance_count: 1
+  infer_instance_type: ml.g4dn.2xlarge
+  sm_endpoint_name: lensa-for-all
