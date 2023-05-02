@@ -6,13 +6,84 @@ This is **Lensa for All**, an application that creates personalized images by fi
 * This used [*Amazon SageMaker*](https://aws.amazon.com/sagemaker/) Services and 🤗 [*Diffusers*](https://huggingface.co/docs/diffusers/index) and [*Accelerate*](https://huggingface.co/docs/accelerate/index) to optimize infrastructure requirements. The model training takes about an hour, which is the equivalent of $1.212 as of April 2023 for `ml.g5.2xlarge` in the Virginia region of the US. (It's less if you use `ml.g4dn.2xlarge`.)
 * This also supports auto-prompting using [Gustavosta's *MagicPrompt*](https://huggingface.co/Gustavosta/MagicPrompt-Stable-Diffusion) based on *GPT2*. 
 
-## Installation
+## Prerequisites
 - - -
 ### Requirements
+* To use AWS services, you must first have an AWS account and have your credentials set up through the AWS CLI. For more information, see [the following documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
+* To use 🤗 *Hub*, you must have a user access token, see [the following documentation](https://huggingface.co/docs/hub/security-tokens) for more information.
+* It's nice to have [*WandB*](https://wandb.ai/site)'s API key so you can monitor your model's training progress, but it's not mandatory.
+
+### Installation
+1. Git clone this repository in a directory of your choice.  
+`git clone https://github.com/youngmki/lensa-for-all.git`  
+2. Install the dependency libraries. I recommend using a virtual environment like [*Conda*](https://docs.conda.io/en/latest/).  
+`pip install -r requirements.txt`  
+
+### Configuration
+* Setup a configuration file named `config/config.yaml`. Entering `hf_token`, `subject_name` and `class_name` are required.
+* Enter `iam_profile_name`, `iam_role`, `s3_bucket` and `wandb_api_key` if you need to specify them yourself.
+* For `with_prior_preservation`, `train_text_encoder` and `max_steps`, read the advice for fine-tuning below and enter the appropriate values. 
+* Enter `train_instance_type` as `ml.g5.2xlarge` if you are using `with_prior_preservation` or `train_text_encoder`, or `ml.g4dn.2xlarge` otherwise.
+```yaml
+environment:
+  iam_profile_name: default
+  region_name: us-east-1
+  iam_role:  # Specify an IAM role that runs the SageMaker jobs. If left blank, it will be created and run.
+  ebs_dataset_dir: input_directory
+  s3_bucket:  # Specify a S3 bucket to store data and artifacts in. If left blank, it will be created and run.
+  s3_base_prefix: lensa-for-all
+  s3_dataset_prefix: input_directory
+  hf_token:  # The Hugging Face token input is mandatory.
+  wandb_api_key:  # The WandB API key input is optional.
+
+input:
+  subject_name: sks  # Enter the name of the subject you want to train the model on. It's okay to be arbitrary (e.g., sks).
+  class_name: person  # Enter the name of the class to which the subjects you want to train the model belong. 
+
+model:
+  use_jumpstart: False  # Select True to use Amazon SageMaker Jumpstart, or False to use the Hugging Face libraries directly.
+  model_data:  # If you already have a model artifact in S3 that you've trained on, enter the prefix here. Otherwise, leave it blank.
+  with_prior_preservation: True
+  train_text_encoder: True  # Not applicable if you are using Amazon SageMaker Jumpstart.
+  max_steps: 300
+  batch_size: 1
+  learning_rate: 1e-06
+  tune_params: False  # If you are using the Amazon SageMaker Tuner to tune hyperparameters, leave it True or False.
+  max_tuning_jobs: 7
+  train_instance_type: ml.g5.2xlarge
+  infer_instance_count: 1
+  infer_instance_type: ml.g4dn.2xlarge
+  sm_endpoint_name: lensa-for-all
+```
 
 ## Usage
 - - -
-1. ...
+1. To train a model of your desired subject, please save 4-20 photos in your project directory as shown below. If possible, I recommend using a jpg/jpeg/png format of 512 × 512 pixels or larger. Also, modify the `config/config.yaml` file to what you want.
+  
+```bash
+input_directory  
+├── instance_image_01.jpg  
+├── instance_image_02.jpg
+├── instance_image_03.jpg
+└── ...
+```
+2. In the terminal, run the following script to upload the saved photos to the S3 bucket.
+
+```bash
+python upload_files.py
+```
+
+3. In the terminal, run the following script to fine-tune the model and deploy it to a *SageMaker Endpoint*.  This should take just over an hour.
+
+```bash
+python tune_and_deploy_models.py
+```
+
+4. Run the *Jupyter Notebook* file as follows and follow the instructions there. When you're done using the model, be sure to remove the *SageMaker Endpoint* to avoid unnecessary costs.
+
+```bash
+jupyter notebook generate_images.ipynb
+```
 
 ![avatars-02](assets/avatars-02.png)
 ## Tips for Successful Fine-tuning
@@ -32,6 +103,7 @@ Also, fine-tuning the text encoder along with the image generator has been shown
 
 ## References
 - - -
+* [‘모두를 위한 렌사’ 만들기 (Korean)](https://medium.com/@aldente0630/%EB%AA%A8%EB%91%90%EB%A5%BC-%EC%9C%84%ED%95%9C-%EB%A0%8C%EC%82%AC-%EB%A7%8C%EB%93%A4%EA%B8%B0-e445adbe445d)
 * [*Stable Diffusion* on *Amazon SageMaker*](https://www.philschmid.de/sagemaker-stable-diffusion)
 * [Fine-Tune Text-to-Image *Stable Diffusion* Models with *Amazon SageMaker JumpStart*](https://aws.amazon.com/blogs/machine-learning/fine-tune-text-to-image-stable-diffusion-models-with-amazon-sagemaker-jumpstart/)
 * [Training *Stable Diffusion* with *Dreambooth* Using 🧨 *Diffusers*](https://huggingface.co/blog/dreambooth)

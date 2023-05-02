@@ -1,9 +1,6 @@
 import os
-import sys
 import yaml
 import boto3
-
-sys.path.append("")
 from utils.logger import logger
 from utils.misc import (
     create_bucket_if_not_exists,
